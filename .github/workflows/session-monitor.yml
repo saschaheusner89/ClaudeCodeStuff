@@ -1,0 +1,61 @@
+name: SessionMonitor (Windows build)
+
+on:
+  push:
+    paths:
+      - "SessionMonitor/**"
+      - ".github/workflows/session-monitor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: SessionMonitor
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Test
+        run: dotnet test tests/ClaudeStatus.Tests -c Release
+
+      - name: Publish hook (Native AOT)
+        run: dotnet publish src/ClaudeStatusHook -c Release -r win-x64 -o out
+
+      - name: Publish viewer (single file)
+        run: >
+          dotnet publish src/ClaudeStatus -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none -o out
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Get-ChildItem out
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item out/ClaudeStatus.exe, out/claude-status-hook.exe, README.md dist/
+          Compress-Archive -Path dist/* -DestinationPath ClaudeStatus-win-x64.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClaudeStatus-win-x64
+          path: SessionMonitor/dist/
+
+      - name: Update "session-monitor-latest" release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "session-monitor-latest"
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          gh release create $tag ClaudeStatus-win-x64.zip `
+            --target "${{ github.sha }}" --prerelease `
+            --title "Claude Session Monitor (neuester Build)" `
+            --notes "Automatischer Build von ${{ github.ref_name }} @ ${{ github.sha }}. ZIP entpacken, ClaudeStatus.exe starten, 'Hooks installieren' klicken."
