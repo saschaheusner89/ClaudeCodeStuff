@@ -33,6 +33,9 @@ Zum Entfernen: Rechtsklick → „Hooks entfernen“ oder `ClaudeStatus.exe --un
 
 ## Bedienung
 
+- Überschrift einer Kachel ist der **Session-Name** (`/rename` bzw. der automatisch erzeugte Titel),
+  sonst der Projektordner. Darunter steht, **was Claude zuletzt geschrieben hat**. Das kommt live aus dem
+  Session-Transcript und wird beim Stop-Hook aktualisiert.
 - **Klick auf eine Session** holt die Claude-Desktop-App in den Vordergrund.
   Eine bestimmte Session direkt öffnen kann die Desktop-App von außen (noch) nicht.
 - **Rechtsklick auf eine Session**: im Terminal fortsetzen (`claude --resume <id>`), Projektordner öffnen,

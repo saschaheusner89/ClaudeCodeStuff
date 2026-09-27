@@ -54,6 +54,9 @@ static void Run()
         Copy(w, root, "prompt", 300);
         Copy(w, root, "source");
         Copy(w, root, "reason");
+        Copy(w, root, "last_assistant_message", 600);
+        Copy(w, root, "session_name", 200);
+        Copy(w, root, "session_title", 200);
 
         if (root.TryGetProperty("tool_input", out var ti) && ti.ValueKind == JsonValueKind.Object)
         {

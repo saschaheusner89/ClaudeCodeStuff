@@ -33,6 +33,8 @@ public sealed record HookEvent
     public string? Description { get; init; }
     public string? SubagentType { get; init; }
     public bool RunInBackground { get; init; }
+    public string? LastAssistantMessage { get; init; }
+    public string? SessionName { get; init; }
 
     public static HookEvent? Parse(string line)
     {
@@ -64,6 +66,8 @@ public sealed record HookEvent
                 Description = S(r, "description"),
                 SubagentType = S(r, "subagent_type"),
                 RunInBackground = r.TryGetProperty("run_in_background", out var bg) && bg.ValueKind == JsonValueKind.True,
+                LastAssistantMessage = S(r, "last_assistant_message"),
+                SessionName = S(r, "session_name") ?? S(r, "session_title"),
             };
         }
         catch (JsonException)
@@ -101,7 +105,12 @@ public sealed class SessionState
 
     public required string SessionId { get; init; }
     public string? Cwd { get; private set; }
+    public string? TranscriptPath { get; private set; }
+    public TranscriptReader? Transcript { get; private set; }
+    public string? SessionName { get; private set; }
     public string? LastPrompt { get; private set; }
+    /// <summary>Claude's final message of the last turn, as reported by the Stop hook.</summary>
+    public string? LastAssistantMessage { get; private set; }
     public string? LastTool { get; private set; }
     public string? AwaitingReason { get; private set; }
     public Status Status { get; private set; } = Status.Idle;
@@ -127,6 +136,12 @@ public sealed class SessionState
         }
     }
 
+    /// <summary>Session name (/rename or auto title), falling back to the project folder.</summary>
+    public string DisplayTitle => Transcript?.Title ?? SessionName ?? ProjectName;
+
+    /// <summary>What Claude wrote last (live from the transcript, or from the Stop hook).</summary>
+    public string? LastText => Transcript?.LastAssistantText ?? LastAssistantMessage;
+
     public string ShortId => SessionId.Length > 8 ? SessionId[..8] : SessionId;
 
     public void Apply(HookEvent e)
@@ -136,6 +151,12 @@ public sealed class SessionState
 
         bool fromAgent = e.AgentId != null && e.Event is not ("SubagentStart" or "SubagentStop");
         if (!fromAgent && e.Cwd != null) Cwd = e.Cwd;
+        if (!fromAgent && e.SessionName != null) SessionName = e.SessionName;
+        if (!fromAgent && e.TranscriptPath != null && e.TranscriptPath != TranscriptPath)
+        {
+            TranscriptPath = e.TranscriptPath;
+            Transcript = new TranscriptReader(e.TranscriptPath);
+        }
 
         switch (e.Event)
         {
@@ -200,6 +221,7 @@ public sealed class SessionState
             case "Stop":
             case "StopFailure":
                 if (fromAgent) break;
+                if (e.LastAssistantMessage != null) LastAssistantMessage = e.LastAssistantMessage;
                 SetStatus(Status.Idle, e.Time);
                 // Foreground agents can't outlive the turn that started them.
                 foreach (var a in Agents)

@@ -87,6 +87,7 @@ public sealed class SessionStore
             }
 
             changed |= tail.State.PruneAgents(now, KeepDoneAgents, MaxAgentSilence);
+            if (tail.State.Transcript is { } transcript) changed |= transcript.Poll();
         }
 
         foreach (var gone in _tails.Keys.Where(k => !seen.Contains(k)).ToList())

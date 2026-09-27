@@ -17,7 +17,7 @@ public sealed class SessionTile : Border
     private readonly StackPanel _header = new() { VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _title = new() { FontWeight = FontWeights.Bold, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TextBlock _status = new() { TextTrimming = TextTrimming.CharacterEllipsis };
-    private readonly TextBlock _prompt = new() { TextTrimming = TextTrimming.CharacterEllipsis, FontStyle = FontStyles.Italic, Opacity = 0.75 };
+    private readonly TextBlock _prompt = new() { TextTrimming = TextTrimming.CharacterEllipsis, Opacity = 0.8 };
     private readonly AdaptivePanel _agents = new() { PreferredAspect = 2.6, Gap = 4 };
     private readonly Dictionary<string, AgentChip> _chips = new();
     private bool? _sideBySide;
@@ -60,18 +60,21 @@ public sealed class SessionTile : Border
         var fg = new SolidColorBrush(look.Text);
         _title.Foreground = _status.Foreground = _prompt.Foreground = fg;
 
-        _title.Text = s.ProjectName;
+        _title.Text = s.DisplayTitle;
+        var project = s.DisplayTitle != s.ProjectName ? s.ProjectName + " · " : "";
         var since = Fmt.Duration(now - s.StatusSince);
         _status.Text = stale
-            ? $"keine Aktivität seit {Fmt.Duration(now - s.LastEventAt)}"
-            : s.Status switch
+            ? $"{project}keine Aktivität seit {Fmt.Duration(now - s.LastEventAt)}"
+            : project + s.Status switch
             {
                 Status.Working => $"arbeitet · {since}" + (s.LastTool != null ? $" · {s.LastTool}" : ""),
                 Status.Awaiting => $"wartet auf dich · {s.AwaitingReason ?? "Rückfrage"} · {since}",
                 _ => $"bereit · {since}",
             };
-        _prompt.Text = s.LastPrompt != null ? "„" + OneLine(s.LastPrompt) + "“" : "";
-        ToolTip = $"{s.ProjectName}\n{s.Cwd}\nSession {s.SessionId}\n\nKlick: Claude öffnen · Rechtsklick: mehr";
+        _prompt.Text = s.LastText != null ? OneLine(s.LastText) : "";
+        ToolTip = $"{s.DisplayTitle}\n{s.Cwd}\nSession {s.SessionId}" +
+                  (s.LastPrompt != null ? $"\n\nDein letzter Prompt: {OneLine(s.LastPrompt)}" : "") +
+                  "\n\nKlick: Claude öffnen · Rechtsklick: mehr";
 
         // Agent mini windows.
         var keys = new HashSet<string>(s.Agents.Select(a => a.Key));
@@ -96,7 +99,7 @@ public sealed class SessionTile : Border
     private static string OneLine(string text)
     {
         var t = text.ReplaceLineEndings(" ").Trim();
-        return t.Length > 160 ? t[..160] + "…" : t;
+        return t.Length > 400 ? t[..400] + "…" : t;
     }
 
     /// <summary>
